@@ -1420,6 +1420,7 @@ fish_fh_open (struct vfs_class *me, vfs_file_handler_t * fh, int flags, mode_t m
 {
     fish_file_handler_t *fish = FISH_FILE_HANDLER (fh);
 
+    (void) me;
     (void) mode;
 
     /* File will be written only, so no need to retrieve it */
@@ -1441,7 +1442,7 @@ fish_fh_open (struct vfs_class *me, vfs_file_handler_t * fh, int flags, mode_t m
 /* --------------------------------------------------------------------------------------------- */
 
 static int
-fh_close (struct vfs_class *me, vfs_file_handler_t * fh)
+fish_fh_close (struct vfs_class *me, vfs_file_handler_t * fh)
 {
     (void) me;
 
@@ -1514,6 +1515,10 @@ fish_read (void *fh, char *buffer, size_t len)
     struct vfs_class *me = super->me;
 
     /* NOT IMPLEMENTED YET */
+    (void) len;
+    (void) buffer;
+    (void) file;
+    (void) me;
 
     return (-1);
 }
@@ -1526,10 +1531,11 @@ fish_write (void *fh, const char *buf, size_t len)
     vfs_file_handler_t *file = VFS_FILE_HANDLER (fh);
     struct vfs_s_super *super = VFS_FILE_HANDLER_SUPER (fh);
     struct vfs_class *me = super->me;
+
     fish_file_handler_t *fish_file = FISH_FILE_HANDLER (fh);
     fish_super_t *fish_super = FISH_SUPER (super);
+
     char *name, *quoted_name;
-    int code;
     ssize_t n;
 
     name = vfs_s_fullpath (me, file->ino);
@@ -1537,20 +1543,19 @@ fish_write (void *fh, const char *buf, size_t len)
     g_free (name);
 
     /* FIXME: File size is limited to ULONG_MAX */
-    code =
-        fish_command_v (me, super, WAIT_REPLY,
+    n = fish_command_v (me, super, WAIT_REPLY,
                         fish_file->append ? fish_super->scr_append : fish_super->scr_send,
                         "FISH_FILENAME=%s FISH_FILESIZE=%" PRIuMAX ";\n", quoted_name,
                         (uintmax_t) len);
     g_free (quoted_name);
 
-    if (code != PRELIM)
+    if (n != PRELIM)
         ERRNOR (E_REMOTE, -1);
 
     n = write (fish_super->sockw, buf, len);
     if (n != (ssize_t) len)
     {
-        if (code == -1)
+        if (n == -1)
             me->verrno = errno;
         else
             me->verrno = EIO;
@@ -1601,6 +1606,7 @@ init_fish (void)
     fish_subclass.free_archive = fish_free_archive;
     fish_subclass.fh_new = fish_fh_new;
     fish_subclass.fh_open = fish_fh_open;
+    fish_subclass.fh_close = fish_fh_close;
     fish_subclass.dir_load = fish_dir_load;
     vfs_register_class (vfs_fish_ops);
 }
